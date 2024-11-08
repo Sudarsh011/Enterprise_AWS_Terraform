@@ -1,0 +1,94 @@
+To install **Terraform Enterprise (TFE)** on **AWS**, follow these steps to set up a secure, scalable environment that meets TFE's requirements. This approach involves deploying TFE on an **EC2 instance** with necessary configurations for high availability and performance.
+
+### Prerequisites
+
+1. **AWS Account**: Ensure you have access with sufficient permissions to create and manage EC2 instances, IAM roles, S3 buckets, and other required resources.
+2. **Terraform Enterprise License**: Obtain a `.rli` license file from HashiCorp.
+3. **SSL Certificate**: Required for production; use a valid SSL certificate or configure AWS ACM to generate one.
+
+### Steps to Install TFE on AWS
+
+#### 1. **Set Up Networking and Security**
+
+   - **VPC**: Use an existing VPC or create a new one.
+   - **Subnets**: At least one public subnet for the EC2 instance hosting TFE.
+   - **Security Groups**: Create a security group with the following rules:
+      - Inbound:
+         - **TCP 443**: HTTPS access for TFE UI.
+         - **TCP 22**: SSH access for management (restricted to your IP for security).
+         - **TCP 8800**: Access to the Admin Console.
+         - **TCP 9870**: For encrypted storage access.
+      - Outbound: Allow all (default) for internet access.
+   - **IAM Role**: Assign an IAM role with permissions to manage S3, DynamoDB (for state management), and EC2.
+
+#### 2. **Launch an EC2 Instance**
+
+   - **AMI**: Use **Ubuntu 20.04** or **Amazon Linux 2**.
+   - **Instance Type**: `m5.large` (4 vCPUs, 16 GB RAM) or larger for production.
+   - **Storage**: At least 100 GB for `/var/lib/replicated`.
+   - **Assign IAM Role**: Attach the IAM role created above to the instance.
+   - **Elastic IP (Optional)**: Assign an Elastic IP to your instance for consistent access.
+
+#### 3. **Install Docker**
+
+SSH into the instance and install Docker:
+
+```bash
+sudo apt update
+sudo apt install -y docker.io
+sudo systemctl enable docker
+sudo systemctl start docker
+```
+
+#### 4. **Download and Run the TFE Installer**
+
+Download the TFE installation script from HashiCorp and run it:
+
+```bash
+curl -o install.sh https://install.terraform.io/ptfe/stable
+sudo bash install.sh
+```
+
+#### 5. **Access the Admin Console**
+
+1. Open a browser and go to `https://<Elastic-IP>:8800`.
+2. Follow the Admin Console setup:
+   - **Upload License**: Upload the `.rli` license file.
+   - **Choose Installation Type**: Select **Online** installation if you have internet access.
+   - **SSL Configuration**: You can either:
+      - Upload your SSL certificate and private key.
+      - Use a self-signed certificate (for testing only).
+   - **Storage Configuration**:
+      - Choose **External Services** for production.
+      - Configure **S3** for object storage (store your state files here) and **DynamoDB** for state locking.
+
+#### 6. **External Services Configuration (Recommended for Production)**
+
+   - **S3 Bucket**: Create an S3 bucket for storing state files, and configure the instance to use it.
+   - **DynamoDB Table**: For state locking, create a DynamoDB table with a primary key called `LockID`.
+   - **PostgreSQL (Optional)**: Use an Amazon RDS PostgreSQL instance if you want external data storage.
+
+#### 7. **Complete the Setup in the TFE Console**
+
+   - After configuring the storage, complete any remaining steps in the TFE UI.
+   - Once set up, log in to **https://<Elastic-IP>** to configure organizations, workspaces, users, and version control provider integrations.
+
+### Important Commands
+
+- **Access Logs**:
+  ```bash
+  docker logs -f replicated replicated-ui replicated-operator
+  ```
+
+- **Restart Services**:
+  ```bash
+  sudo systemctl restart replicated replicated-ui replicated-operator
+  ```
+
+### AWS-Specific Recommendations
+
+- **High Availability**: For a production setup, deploy TFE in multiple availability zones and configure an Elastic Load Balancer (ELB).
+- **Database Backups**: Regularly back up your PostgreSQL database (if using RDS) and S3 bucket.
+- **Scaling**: Use an instance size that matches your expected workload, and monitor for performance.
+
+This setup will allow you to securely and efficiently run Terraform Enterprise in AWS. Let me know if you need guidance on specific configurations!
